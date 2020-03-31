@@ -1,0 +1,4 @@
+1.0
+    * WiFi & MQTT Connection Management
+    * Reading Temperature & Humidity Sensors
+    * Support TTL CallBack

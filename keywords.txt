@@ -1,0 +1,25 @@
+#######################################
+# Syntax Coloring Map For SlowControl
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SlowControl	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+run	KEYWORD2
+resetWifiSettings	KEYWORD2
+connectToWifi	KEYWORD2
+connectToMQTT 	KEYWORD2
+getNumberOfTemperatureSensors	KEYWORD2
+getNumberOfHumiditySensors	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
