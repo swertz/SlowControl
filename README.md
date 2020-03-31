@@ -1,7 +1,7 @@
 # SlowControl
 A library that allow you to communicate to Slow Control Board designed by UCLouvain.
 
-# Examples
+# Example
 The library comes from a basic Sketch. See File > Examples > SlowControl within the Arduino application.
 
 # Compatible Hardware
