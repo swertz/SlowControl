@@ -12,7 +12,7 @@ Actually, the library is specifially writed to be compatible with our designed b
 
 # What does the library include ?
 
-- First automated wifi connection creating AP
-- MQTT Communication Management - Automatically reconnecting when server is reachable
-- Sensors readings independent from Network Connection
-- Event Status Update of others DiSCo Board based on MQTT Subscription
+- First automated wifi connection creating Acces Point to enter WiFi Informations || Take previous credentials if it has already connected.
+- MQTT Communication Management || Automatically reconnecting when server is reachable.
+- Sensors readings independent from Network Connection.
+- Event Status Update of others DiSCo Board based on MQTT Subscription.
