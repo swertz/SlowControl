@@ -40,7 +40,7 @@
 #define statusTTL_topic "status/ttl/" //Will use the ID of the Board to retrieve where the status come from
 
 class SlowControl {
-	public :
+    public :
         /**
          *  Constructor.
          */
@@ -148,7 +148,7 @@ class SlowControl {
          */
         void callbackTTL(char* topic, byte* payload, unsigned int length); 		
         
-	private :
+    private :
         /**
          *  Constructor.
          */
