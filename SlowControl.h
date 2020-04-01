@@ -146,7 +146,7 @@ class SlowControl {
          *
          * Get feeback from topic that changed if you subscribed to them
          */
-        void callbackTTL(char* topic, byte* payload, unsigned int length); 		
+        void callbackTTL(char* topic, byte* payload, unsigned int length); 
         
     private :
         /**
@@ -174,7 +174,7 @@ class SlowControl {
         bool myConnectToTTL;
         
         /**
-         *  Functions
+         *  Private Functions
          */
         String byteArrayToString( byte*payload, unsigned int length);
 
