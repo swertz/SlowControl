@@ -17,7 +17,7 @@ void setup()
 	slowControl.connectToWifi();
 
 	//Initialize MQTT Communication
-	slowControl.connectToMQTT(3,"ESP01",true); //Parameter 1 = Number of Try  || Parameter 2 = ID of the Board || Parameter 3 = Subscription to TTl Status 
+	slowControl.connectToMQTT(3,"ESP01",true); //Parameter 1 = Number of Try  || Parameter 2 = ID of the Board || Parameter 3 = Subscription to TTL Status 
 
 	//Get Number Of Temperature Sensors on the OneWire Bus
 	slowControl.getNumberOfTemperatureSensors();
