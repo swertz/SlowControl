@@ -76,7 +76,7 @@ class SlowControl {
 		/**
          * Initialises the MQTT Communication
          *
-         *Take default MQTT Server as paramaters
+         *Take default MQTT Server, Client ID & TTL Subscription feedback
 		 *
 		 *If it doesnt suit, pass yours as paramaters
          */
@@ -85,79 +85,66 @@ class SlowControl {
 		/**
          * Initialises the MQTT Communication
          *
-         *Take default MQTT Server as paramaters
+         *Param 1 : Topic where you want to publish || Param 2 : Data you want to publish
 		 *
-		 *If it doesnt suit, pass yours as paramaters
          */
-		void publishToMQTT(const char* topic, const char* payload);		
+		void publishToMQTT(const char* topic, const char* payload);	//--> Verified
 			
 		/**
-         * Initialises the MQTT Communication
+         * Subscribe to TTL Status
          *
-         *Take default MQTT Server as paramaters
+         *Take default TTL Topic as paramaters
 		 *
 		 *If it doesnt suit, pass yours as paramaters
          */
-		void subscribeToSCBStatus(const char* topic=statusTTL_topic); 
+		void subscribeToSCBStatus(const char* topic=statusTTL_topic); //--> Verified
 			
 		/**
          * Gets number of Temperature Sensors.
-         *
-		 * @param gpio  Refers to the GPIO where the OneWire Bus is connected
 		 *
-         * @return A int value indicating the number of temperature sensors that are on the OneWire BUS.
+         * Print on the serial monitor value indicating the number of DS sensors that are on the OneWire BUS.
          */
         void getNumberOfTemperatureSensors(); //--> Verified
 		
 		/**
          * Gets number of Humidity Sensors.
          *
-         * @return A int value indicating the number of humidity sensors that are on the I2C BUS.
+         * Print on the serial monitor value indicating the number of SHT sensors that are on the OneWire BUS.
          */
         void getNumberOfHumiditySensors(); //--> Verified
 		
 		/**
          * Gets a single temperature reading from the sensor.
          *
-		 * @param number  The number of Sensors to read.
-		 *
-         * @return A float value indicating the temperature.
+         * Write value to global variable indicating the temperature of DS Sensor.
          */
         void readTemperature();
 		
 		/**
          * Gets a single relative humidity reading from the sensor.
          *
-		 * @param number   The number of Sensors to read.
-		 *
-         * @return A float value representing relative humidity.
+         * Write value to global variable indicating the temperature of SHT Sensor.
          */
         void readTempSHT();
 		
 		/**
          * Gets a single relative humidity reading from the sensor.
          *
-		 * @param number   The number of Sensors to read.
-		 *
-         * @return A float value representing relative humidity.
+         * Write value to global variable indicating the Humidity of SHT Sensor.
          */
 		void readHumiditySHT();
 		
 		/**
          * Calculate dewPoint from Temperature & Humidity.
          *
-		 * @param number   The number of Sensors to read.
-		 *
-         * @return A float value representing relative humidity.
+         * Calculate from SHTTemp & SHTHumi and write value to global variable indicating the DewPoint .
          */
         void calculateDewPointSHT();
 
-		 		/**
-         * Initialises the MQTT Communication
+		 /**
+         * Setup callback function 
          *
-         *Take default MQTT Server as paramaters
-		 *
-		 *If it doesnt suit, pass yours as paramaters
+		 * Get feeback from topic that changed if you subscribed to them
          */
 		void callbackTTL(char* topic, byte* payload, unsigned int length); 		
 		
@@ -186,7 +173,7 @@ class SlowControl {
 		 bool ttlStatus;
 		 bool myConnectToTTL;
 		  
-		  /**
+		/**
          *  Functions
          */
 		 String byteArrayToString( byte*payload, unsigned int length);
