@@ -83,7 +83,7 @@ class SlowControl {
 		void connectToMQTT(int nbr=SLOWCONTROL_DEFAULT_NBR_OF_TRY, const char* clientID = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID,bool connectToTTL=false); //--> Verified
 		
 		/**
-         * Initialises the MQTT Communication
+         * Publish to MQTT Topic
          *
          *Param 1 : Topic where you want to publish || Param 2 : Data you want to publish
 		 *
