@@ -33,10 +33,14 @@ SlowControl::SlowControl()
     ttlSimulate=false;
     ttlStatus=false;
     myConnectToTTL=false;
+	myMqttServer="";
 }
 
 void SlowControl::begin(const char* mqtt_server)
 {
+	//Get reference of server
+	myMqttServer=mqtt_server;
+	
     //Setup MQTT Server    
     mqttClient.setServer(mqtt_server,1883);
     
@@ -144,7 +148,7 @@ void SlowControl::connectToMQTT(int nbr,const char* clientID,bool connectToTTL)
     {
         for (int i=0;i<nbr;i++)
         {
-            Serial.println("Attempting MQTT Connection..."+String(i+1)+"/"+String(nbr));
+            Serial.println("Attempting MQTT Connection..."+String(i+1)+"/"+String(nbr)+ " targeting -> "+myMqttServer);
             if(mqttClient.connect(myClientID))
             {
                 Serial.println("Connected to MQTT Server.");

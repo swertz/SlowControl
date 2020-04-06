@@ -172,6 +172,7 @@ class SlowControl {
         bool ttlSimulate;
         bool ttlStatus;
         bool myConnectToTTL;
+		const char* myMqttServer;
         
         /**
          *  Private Functions
