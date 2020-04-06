@@ -212,7 +212,12 @@ void SlowControl::getNumberOfTemperatureSensors()
     Serial.print(deviceTempCount, DEC);
     Serial.println(" devices.");
     Serial.println("");
-	dsFound=true;
+	
+	//Check if there're some devices
+	if(deviceTempCount!=0)
+	{
+		dsFound=true;
+	}
 }
 
 void SlowControl::getNumberOfHumiditySensors()
