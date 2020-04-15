@@ -117,8 +117,7 @@ void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusR
 
 void SlowControl::connectToWifi()
 {
-    //Exit after config instead of connecting
-    wifiManager.setBreakAfterConfig(true);
+    //wifiManager.setBreakAfterConfig(true); //Try to connect one time and thens exits.
     
     if (!wifiManager.autoConnect("AutoConnectAP", "password")) 
     {
