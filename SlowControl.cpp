@@ -13,6 +13,11 @@
  
 #include "SlowControl.h"
 
+#define my_mqtt_server       "xxx.cloudmqtt.com"
+#define my_mqtt_port         "1883"
+
+bool SlowControl::shouldSaveConfig=false;
+
 SlowControl::SlowControl()
 {
     //Declare instance of OneWire
@@ -33,25 +38,22 @@ SlowControl::SlowControl()
     ttlSimulate=false;
     ttlStatus=false;
     myConnectToTTL=false;
-	myMqttServer="";
+	/*myMqttServer=NULL;	
+	myMqttPort=NULL;*/
+	mqttServerSet=false;
+	//shouldSaveConfig=false;
 }
 
-void SlowControl::begin(const char* mqtt_server)
+void SlowControl::begin()
 {
-	//Get reference of server
-	myMqttServer=mqtt_server;
-	
-    //Setup MQTT Server    
-    mqttClient.setServer(mqtt_server,1883);
-    
-    //Setup Callback
-    mqttClient.setCallback(([this] (char* topic, byte* payload, unsigned int length) { this->callbackTTL(topic, payload, length); }));
-    
     //Start DS Sensors Communication
     ds.begin();
     
     //Start Humidity Sensors Communication
     sht.begin(SLOWCONTROL_DEFAULT_HUMIDITSENSOR_ADDRESS,SLOWCONTROL_DEFAULT_SDA_PIN,SLOWCONTROL_DEFAULT_SCL_PIN);
+	
+	//Serial Begin
+	Serial.begin(115200);
 }
 
 void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusReadHumiditySHT, bool statusCalculateDewPointSHT, bool publishToMQTT)
@@ -115,10 +117,99 @@ void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusR
     }
 }
 
+void SlowControl::setMQTTServer(String mqtt_server,uint16_t mqtt_port)
+{
+	if(mqtt_server!="")
+	{
+	  //Get reference of server
+	  mqtt_server.toCharArray(myMqttServer,15);
+	
+      //Setup MQTT Server    
+      mqttClient.setServer(myMqttServer,mqtt_port);
+    
+      //Setup Callback
+      mqttClient.setCallback(([this] (char* topic, byte* payload, unsigned int length) { this->callbackTTL(topic, payload, length); }));
+	  
+	  //Status of set
+	  mqttServerSet=true;
+	  
+	}
+	else
+	{
+		Serial.println("MQTT Serverd not hardcoded");
+	}
+}
+
+void SlowControl::checkJSONConfig()
+{
+	Serial.println("mounting FS...");
+	
+	if(SPIFFS.begin())
+	{
+		Serial.println("Mounted File System");
+		if(SPIFFS.exists("/config.json"))
+		{
+			Serial.println("Reading Config File");
+			File configFile = SPIFFS.open("/config.json","r");
+			if(configFile)
+			{
+				Serial.println("Opened Config File");
+				size_t size = configFile.size();
+				//Allocate a buffer to store the contents of the file.
+				std::unique_ptr<char[]> buf(new char [size]);
+				
+				configFile.readBytes(buf.get(),size);
+				DynamicJsonBuffer jsonBuffer;
+				JsonObject& json = jsonBuffer.parseObject(buf.get());
+				json.printTo(Serial);
+				if (json.success())
+				{
+					strcpy(myMqttServer, json["mqtt_server"]);
+					strcpy(myMqttPort, json["mqtt_port"]);
+				}
+				else
+				{
+					Serial.println("Failed to lad Json Config");
+				}
+			}
+		}
+		else
+		{
+			Serial.println("JSON File doesn't exist");
+		}
+			
+	}
+	else
+	{
+		Serial.println("Failed to mount FS");
+	}
+}
+void SlowControl::saveConfigCallback()
+{
+	Serial.println("Should Save Config");
+	shouldSaveConfig=true;
+}
+
 void SlowControl::connectToWifi()
 {
-    //wifiManager.setBreakAfterConfig(true); //Try to connect one time and thens exits.
+	//Check Json Config File
+	checkJSONConfig();
+	
+	//Set Config Save Notify Callback
+	wifiManager.setSaveConfigCallback(&SlowControl::saveConfigCallback);
+	
+	WiFiManagerParameter custom_mqtt_server("server", "mqtt server", myMqttServer, 40);
+	WiFiManagerParameter custom_mqtt_port("port", "mqtt port", myMqttPort, 6);
+	
+	//Check If MQTT Credentials have been hardcoded
+	if(mqttServerSet==false)
+	{   
+      //wifiManager.setBreakAfterConfig(true); //Try to connect one time and thens exits.
+	  wifiManager.addParameter(&custom_mqtt_server);
+	  wifiManager.addParameter(&custom_mqtt_port);
+	}
     
+	//Start Acces Point Configuration if you never connected the board to a WiFi previously
     if (!wifiManager.autoConnect("AutoConnectAP", "password")) 
     {
         Serial.println("failed to connect, we should reset as see if it connects");
@@ -126,20 +217,49 @@ void SlowControl::connectToWifi()
         ESP.reset();
         delay(5000);
     }
+		
     Serial.println("Connected to WIFI");
-    
-    Serial.print("The IP Address of the module is :");
-    Serial.println(WiFi.localIP());
-    Serial.println();
+	
+	delay(1000);
+	
+	//Get value
+	strcpy(myMqttServer,custom_mqtt_server.getValue());
+	strcpy(myMqttPort,custom_mqtt_port.getValue());
+	
+	//Save to FS
+	if(shouldSaveConfig)
+	{
+		Serial.println("Saving Config");
+		DynamicJsonBuffer jsonBuffer;
+		JsonObject& json = jsonBuffer.createObject();
+		json["mqtt_server"] = myMqttServer ;
+		json["mqtt_port"] = myMqttPort ;
+		
+		File configFile = SPIFFS.open("/config.json","w");
+		if(!configFile)
+		{
+			Serial.println("Failed to open config file for writing");
+		}
+		
+		json.prettyPrintTo(Serial);
+		json.printTo(configFile);
+		configFile.close();
+		shouldSaveConfig = false;
+	}
 }
 
 void SlowControl::resetWifiSettings()
 {
+	mqttServerSet=false;
     wifiManager.resetSettings();
 }
 
 void SlowControl::connectToMQTT(int nbr,const char* clientID,bool connectToTTL)
 {
+	if(myMqttServer!="")
+	{
+		setMQTTServer(myMqttServer,String(myMqttPort).toInt());
+	}
     myClientID=clientID;
     myConnectToTTL=connectToTTL;
     //Try to connect to MQTT Server 5 times | 5 S timeout
@@ -147,7 +267,8 @@ void SlowControl::connectToMQTT(int nbr,const char* clientID,bool connectToTTL)
     {
         for (int i=0;i<nbr;i++)
         {
-            Serial.println("Attempting MQTT Connection..."+String(i+1)+"/"+String(nbr)+ " targeting -> "+myMqttServer);
+			Serial.println("Attempting MQTT Connection..."+String(i+1)+"/\0"+String(nbr)+ " targeting -> "+String(myMqttServer));
+
             if(mqttClient.connect(myClientID))
             {
                 Serial.println("Connected to MQTT Server.");
@@ -183,7 +304,7 @@ void SlowControl::publishToMQTT(const char* topic, const char* payload)
 
 void SlowControl::subscribeToSCBStatus(const char* topic) 
 {
-    mqttClient.subscribe(topic);
+	mqttClient.subscribe(topic);
 }
 
 void SlowControl::callbackTTL(char* topic, byte* payload, unsigned int length)
@@ -324,8 +445,76 @@ String SlowControl::byteArrayToString( byte*payload, unsigned int length)
   return myMsg;
 }
 
+/*void SlowControl::getDataFromEEPROM()
+{
+	int myData;
+	
+	//Get First IP
+	firstIP=EEPROMReadInt(adressMQTT);
+	Serial.println(firstIP);
 
+	//Get Second IP
+	secondIP=EEPROMReadInt(adressMQTT+2);
+	Serial.println(secondIP);
+	
+	//Get Third IP
+	thirdIP=EEPROMReadInt(adressMQTT+4);
+	Serial.println(thirdIP);
 
+	//Get Fourth IP
+	fourthIP=EEPROMReadInt(adressMQTT+6);
+    
+	Serial.println(fourthIP);
+	
+	//Get Port
+	myPort=EEPROMReadInt(adressMQTT+8);
+	Serial.println(myPort);
+	
+	if(myPort==65535)
+    {
+      myPort=0;
+    }
+	else
+	{
+		myIntMqttPort=myPort;
+	}
+	
+	//Restore IP String
+	if(firstIP!=65535 && secondIP!=65535 && thirdIP!=65535 && fourthIP!=65535)
+	{
+		myStrMqttServer = String(firstIP)+"."+String(secondIP)+"."+String(thirdIP)+"."+String(fourthIP);
+		
+		setMQTTServer((char*)myStrMqttServer.c_str());
+		Serial.println(myStrMqttServer);
+	}
+}*/
+
+String SlowControl::getValue(String data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length();
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
+/*void SlowControl::EEPROMWriteInt(int address, int number)
+{
+  EEPROM.write(address, number >> 8);
+  EEPROM.write(address + 1, number & 0xFF);
+}*/
+
+/*int SlowControl::EEPROMReadInt(int address)
+{
+  return (EEPROM.read(address) << 8) + EEPROM.read(address + 1);
+}*/
 
 
 

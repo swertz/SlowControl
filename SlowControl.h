@@ -10,7 +10,7 @@
   Written by Antoine Deblaere for IRMP/CP3
   BSD license, all text above must be included in any redistribution
  ****************************************************/
- 
+
 #ifndef SlowControl_H
 #define SlowControl_H
 
@@ -22,10 +22,12 @@
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <SHT85.h>
+#include <ArduinoJson.h>
 
 
 //#define SLOWCONTROL_DEFAULT_MQTT_SERVER "DESKTOP-09R46K7.local"
-#define SLOWCONTROL_DEFAULT_MQTT_SERVER "192.168.0.81"
+#define SLOWCONTROL_DEFAULT_MQTT_SERVER ""
+#define SLOWCONTROL_DEFAULT_MQTT_PORT 1883
 #define SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID "SlowControlBoard"
 #define SLOWCONTROL_DEFAULT_NBR_OF_TRY 5
 #define SLOWCONTROL_DEFAULT_HUMIDITSENSOR_ADDRESS 0X44
@@ -40,6 +42,11 @@
 #define dewPointSHT_topic "sensors/humidity/SHTDewPoint"
 #define statusTTL_topic "status/ttl/" //Will use the ID of the Board to retrieve where the status come from
 
+#define MQTTSERVERFILE_IP "/mqtt_credentials_ip.txt"
+#define MQTTSERVERFILE_PORT "/mqtt_credentials_port.txt"
+
+
+
 class SlowControl {
     public :
         /**
@@ -50,13 +57,22 @@ class SlowControl {
         /**
          * Initialises the Slow Control Library
          */
-        void begin(const char* mqtt_server = SLOWCONTROL_DEFAULT_MQTT_SERVER); //--> Verified
+        void begin(); //--> Verified
         
         /**
          * Start running of the Slow Control Library
          */
         void run(bool statusReadTempDS,bool statusReadTempSHT, bool statusReadHumiditySHT, bool statusCalculateDewPointSHT, bool publishToMQTT); //--> Verified	
 
+        /**
+         * Set the MQTT Server harcoded
+         *
+         * Take parameter of the function and provides it to the MQTT Client
+        *
+         *If not create you will be able to enter it in the Access Point while configuring the Wifi
+         */
+        void setMQTTServer(String mqtt_server=SLOWCONTROL_DEFAULT_MQTT_SERVER, uint16_t mqtt_port=SLOWCONTROL_DEFAULT_MQTT_PORT); //--> Verified	
+		
         /**
          * Initialises the WIFI Communication
          *
@@ -173,13 +189,28 @@ class SlowControl {
         bool ttlSimulate;
         bool ttlStatus;
         bool myConnectToTTL;
-		const char* myMqttServer;
-        
+	    char myMqttServer[40];
+		char myMqttPort[6];
+		bool mqttServerSet;
+		static bool shouldSaveConfig;
+		
+
         /**
          *  Private Functions
          */
         String byteArrayToString( byte*payload, unsigned int length);
-
+		
+		String getValue(String data, char separator, int index);
+		
+	     /**
+         * Check JSON Config File
+         *
+         *
+         *
+         */
+        void checkJSONConfig();	
+		
+		static void saveConfigCallback();
 };
 
 #endif

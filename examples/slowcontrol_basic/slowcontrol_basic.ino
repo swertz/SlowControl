@@ -9,6 +9,9 @@ void setup()
 
 	//Start Slow Control Library
 	slowControl.begin();
+	
+	//Set MQTT Server - Uncomment this function if you want to hardcode your MQTT Credentials - If not you will be able to enter it in the Acces Point Configuration
+    //slowControl.setMQTTServer("192.168.0.81");
 
 	//Reset WiFi Settings if needed
 	//slowControl.resetWifiSettings();
@@ -17,7 +20,7 @@ void setup()
 	slowControl.connectToWifi();
 
 	//Initialize MQTT Communication
-	slowControl.connectToMQTT(3,"ESP01",true); //Parameter 1 = Number of Try  || Parameter 2 = ID of the Board || Parameter 3 = Subscription to TTL Status 
+	slowControl.connectToMQTT(3,"ESP01",true); //Parameter 1 = Number of Try  || Parameter 2 = ID of the Board || Parameter 3 = Subscription to TTl Status 
 
 	//Get Number Of Temperature Sensors on the OneWire Bus
 	slowControl.getNumberOfTemperatureSensors();
