@@ -20,21 +20,10 @@ bool SlowControl::shouldSaveConfig=false;
 
 SlowControl::SlowControl()
 {
-    //Declare instance of OneWire
-    OneWire oneWire(SLOWCONTROL_DEFAULT_ONEWIRE);
-    
-    //Setup DallasLibrary Reference
-    ds.setOneWire(&oneWire);
-    
     //Pass WiFi Connection parameters to MQTT
     mqttClient.setClient(espClient);
     
     //Setup Default Variables
-    dsFound=false;
-    shtFound=false;
-    tempSHTC=0.0;
-    humiSHT=0.0;
-    deviceTempCount = 0;
     ttlSimulate=false;
     ttlStatus=false;
     myConnectToTTL=false;
@@ -46,18 +35,20 @@ SlowControl::SlowControl()
 
 void SlowControl::begin()
 {
-    //Start DS Sensors Communication
-    ds.begin();
-    
-    //Start Humidity Sensors Communication
-    sht.begin(SLOWCONTROL_DEFAULT_HUMIDITSENSOR_ADDRESS,SLOWCONTROL_DEFAULT_SDA_PIN,SLOWCONTROL_DEFAULT_SCL_PIN);
-	
 	//Serial Begin
 	Serial.begin(115200);
+	
+	//Set TTl as OUTPUT
+	pinMode(SLOWCONTROL_DEFAULT_TTL,OUTPUT);
+	digitalWrite(SLOWCONTROL_DEFAULT_TTL,LOW);
 }
 
-void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusReadHumiditySHT, bool statusCalculateDewPointSHT, bool publishToMQTT)
+void SlowControl::run()
 {
+	//Check Serial Input
+	receiveWithEndMarker();
+	showNewData();
+	
     //Check MQTT Connection
     if(!mqttClient.connected())
     {
@@ -65,36 +56,8 @@ void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusR
     }
     mqttClient.loop();
     
-    //Check Need of Reading
-    if(statusReadTempDS)
-    {
-        //Read DS18B20 Temperature
-        readTemperature();
-    }
-    
-    //Check Need of Reading
-    if(statusReadTempSHT)
-    {
-        ///Read SHT85 Temperature
-        readTempSHT();
-    }
-    
-    //Check Need of Reading
-    if(statusReadHumiditySHT)
-    {
-        //Read SHT85 Humidity
-        readHumiditySHT();
-    }
-    
-    //Check Need of Reading
-    if(statusCalculateDewPointSHT)
-    {
-        //Calculate SHT85 Dewpoint
-        calculateDewPointSHT();    
-    }
-    
     //Check Need of Publishing to MQTT
-    if(publishToMQTT)
+    /*if(publishToMQTT)
     {
         if(mqttClient.connected())
         {
@@ -114,7 +77,7 @@ void SlowControl::run(bool statusReadTempDS,bool statusReadTempSHT, bool statusR
             Serial.println("Not Connected to MQTT Server. Please be sure that your MQTT Server is functional.");
             Serial.println();
         }
-    }
+    }*/
 }
 
 void SlowControl::setMQTTServer(String mqtt_server,uint16_t mqtt_port)
@@ -219,8 +182,10 @@ void SlowControl::connectToWifi()
     }
 		
     Serial.println("Connected to WIFI");
-	
 	delay(1000);
+	
+	//Print MAC ADRESS
+	Serial.println(WiFi.macAddress());
 	
 	//Get value
 	strcpy(myMqttServer,custom_mqtt_server.getValue());
@@ -297,9 +262,34 @@ void SlowControl::connectToMQTT(int nbr,const char* clientID,bool connectToTTL)
     }
 }
 
+bool SlowControl::isConnected()
+{
+	if (mqttClient.connected())
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 void SlowControl::publishToMQTT(const char* topic, const char* payload) 
 {
     mqttClient.publish(topic,payload);
+}
+
+void SlowControl::publishValues(String *data_array)
+{
+	char buffer [100 ];
+
+	for (int i=0;i<data_array->length();i++)
+	{
+		strcpy(buffer,myClientID);
+		strcat(buffer,mqtt_topics[i].c_str());
+
+		publishToMQTT(buffer,data_array[i].c_str());
+	}
 }
 
 void SlowControl::subscribeToSCBStatus(const char* topic) 
@@ -323,7 +313,12 @@ void SlowControl::callbackTTL(char* topic, byte* payload, unsigned int length)
     }
 }
 
-void SlowControl::getNumberOfTemperatureSensors()
+void SlowControl::set_TTL_OUTPUT(int state)
+{
+	digitalWrite(SLOWCONTROL_DEFAULT_TTL,state);
+}
+
+/*void SlowControl::getNumberOfTemperatureSensors()
 {
     // Locating devices on the bus
     Serial.print("Locating temperatures sensors...");
@@ -429,7 +424,7 @@ void SlowControl::calculateDewPointSHT()
         Serial.println();
     }
     
-}
+}*/
 
 
 //Private Fuctions
@@ -443,6 +438,38 @@ String SlowControl::byteArrayToString( byte*payload, unsigned int length)
       myMsg+= (char)payload[i];
     }
   return myMsg;
+}
+
+void SlowControl::receiveWithEndMarker()
+{
+	static byte ndx = 0;
+    char endMarker = '\@';
+    char rc;
+   
+    while (Serial.available() > 0 && newData == false) {
+        rc = Serial.read();
+
+        if (rc != endMarker) {
+            receivedChars[ndx] = rc;
+            ndx++;
+            if (ndx >= numChars) {
+                ndx = numChars - 1;
+            }
+        }
+        else {
+            receivedChars[ndx] = '\0'; // terminate the string
+            ndx = 0;
+            newData = true;
+        }
+    }
+}
+
+void SlowControl::showNewData()
+{
+	if(newData==true)
+	{
+		resetWifiSettings();
+	}
 }
 
 /*void SlowControl::getDataFromEEPROM()

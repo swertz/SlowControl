@@ -15,13 +15,11 @@
 #define SlowControl_H
 
 #include "Arduino.h"
-#include <DallasTemperature.h>
 #include "ESP8266WiFi.h"
 #include <PubSubClient.h>
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-#include <SHT85.h>
 #include <ArduinoJson.h>
 
 
@@ -36,11 +34,13 @@
 #define SLOWCONTROL_DEFAULT_TTL 16
 #define SLOWCONTROL_DEFAULT_ONEWIRE 4
 
-#define temperatureDS_topic "sensors/temperature/DSTemp"
-#define temperatureSHT_topic "sensors/temperature/SHTTemp"
-#define humiditySHT_topic "sensors/humidity/SHTHumi"
-#define dewPointSHT_topic "sensors/humidity/SHTDewPoint"
-#define statusTTL_topic "status/ttl/" //Will use the ID of the Board to retrieve where the status come from
+//Topics Definitions
+#define DS_TEMP_TOPIC  "/sensors/DS/temp"
+#define BME_TEMP_TOPIC "/sensors/BME/temp"
+#define BME_HUMI_TOPIC "/sensors/BME/humi"
+#define CCS_CO2_TOPIC  "/sensors/CCS/co2"
+#define CCS_TVOC_TOPIC "/sensors/CCS/tvoc"
+#define statusTTL_topic "/status/ttl/" //Will use the ID of the Board to retrieve where the status come from
 
 #define MQTTSERVERFILE_IP "/mqtt_credentials_ip.txt"
 #define MQTTSERVERFILE_PORT "/mqtt_credentials_port.txt"
@@ -62,7 +62,7 @@ class SlowControl {
         /**
          * Start running of the Slow Control Library
          */
-        void run(bool statusReadTempDS,bool statusReadTempSHT, bool statusReadHumiditySHT, bool statusCalculateDewPointSHT, bool publishToMQTT); //--> Verified	
+        void run(); //--> Verified	
 
         /**
          * Set the MQTT Server harcoded
@@ -98,6 +98,12 @@ class SlowControl {
          *If it doesnt suit, pass yours as paramaters
          */
         void connectToMQTT(int nbr=SLOWCONTROL_DEFAULT_NBR_OF_TRY, const char* clientID = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID,bool connectToTTL=false); //--> Verified
+		
+		
+        /**
+         * Check if MQTT is connected
+         */
+        bool isConnected(); //--> Verified
         
         /**
          * Publish to MQTT Topic
@@ -106,7 +112,15 @@ class SlowControl {
          *
          */
         void publishToMQTT(const char* topic, const char* payload);	//--> Verified
-        
+		
+		/**
+         * Publish values to MQTT Server
+         *
+         *Param 1 : Topic where you want to publish || Param 2 : Data you want to publish
+         *
+         */
+        void publishValues(String *data_array);	//--> Verified
+		 
         /**
          * Subscribe to TTL Status
          *
@@ -164,7 +178,12 @@ class SlowControl {
          * Get feeback from topic that changed if you subscribed to them
          */
         void callbackTTL(char* topic, byte* payload, unsigned int length); 
-        
+		
+		/**
+         * Trigger TTL
+         */
+		void set_TTL_OUTPUT(int state);
+		
     private :
         /**
          *  Constructor.
@@ -172,19 +191,15 @@ class SlowControl {
         WiFiManager wifiManager;
         WiFiClient espClient;
         PubSubClient mqttClient;
-        DallasTemperature ds;
-        SHT85 sht;
+		
+		/**
+		 * Strig array for containing MQTT Topics
+		 */
+		 String mqtt_topics[5] = {"/sensors/DS/temp","/sensors/BME/temp","/sensors/BME/humi","/sensors/CCS/co2","/sensors/CCS/tvoc"};
         
         /**
          *  Status of Sensors Variables.
          */
-        bool dsFound;
-        bool shtFound;
-        int deviceTempCount;
-        float tempDSC;
-        float tempSHTC;
-        float humiSHT;
-        double dewPointSHT;
         const char* myClientID;
         bool ttlSimulate;
         bool ttlStatus;
@@ -194,6 +209,10 @@ class SlowControl {
 		bool mqttServerSet;
 		static bool shouldSaveConfig;
 		
+		/**
+         *  Values of Sensors for Alarms.
+         */
+		
 
         /**
          *  Private Functions
@@ -201,6 +220,20 @@ class SlowControl {
         String byteArrayToString( byte*payload, unsigned int length);
 		
 		String getValue(String data, char separator, int index);
+		
+		void receiveWithEndMarker();
+		
+		void showNewData();
+		
+		/**
+		 *
+		 */
+		const static byte numChars = 32;
+		
+		char receivedChars[numChars];   // an array to store the received data
+
+		boolean newData = false;
+
 		
 	     /**
          * Check JSON Config File
