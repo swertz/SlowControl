@@ -29,24 +29,26 @@
 #define SLOWCONTROL_DEFAULT_MQTT_PORT 1883
 #define SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID "SlowControlBoard"
 #define SLOWCONTROL_DEFAULT_NBR_OF_TRY 5
-#define SLOWCONTROL_DEFAULT_HUMIDITSENSOR_ADDRESS 0X44
-#define SLOWCONTROL_DEFAULT_SDA_PIN 13
-#define SLOWCONTROL_DEFAULT_SCL_PIN 14
+//#define SLOWCONTROL_DEFAULT_HUMIDITSENSOR_ADDRESS 0X44
+//#define SLOWCONTROL_DEFAULT_SDA_PIN 13
+//#define SLOWCONTROL_DEFAULT_SCL_PIN 14
 #define SLOWCONTROL_DEFAULT_TTL 16
-#define SLOWCONTROL_DEFAULT_ONEWIRE 4
+//#define SLOWCONTROL_DEFAULT_ONEWIRE 4
 
 // Topics Definitions
 #define DS_TEMP_TOPIC "/sensors/DS/temp"
 #define BME_TEMP_TOPIC "/sensors/BME/temp"
 #define BME_HUMI_TOPIC "/sensors/BME/humi"
+#define BME_DEW_TOPIC "/sensors/BME/dew"
 #define CCS_CO2_TOPIC "/sensors/CCS/co2"
 #define CCS_TVOC_TOPIC "/sensors/CCS/tvoc"
+#define SCD30_TEMP_TOPIC "/sensors/SCD30/temp"
+#define SCD30_HUMI_TOPIC "/sensors/SCD30/humi"
+#define SCD30_DEW_TOPIC "/sensors/SCD30/dew"
+#define SCD30_CO2_TOPIC "/sensors/SCD30/co2"
 #define statusTTL_topic                                                        \
   "/status/ttl/" // Will use the ID of the Board to retrieve where the status
                  // come from
-
-#define MQTTSERVERFILE_IP "/mqtt_credentials_ip.txt"
-#define MQTTSERVERFILE_PORT "/mqtt_credentials_port.txt"
 
 class SlowControl {
 public:
@@ -118,7 +120,7 @@ public:
    *publish
    *
    */
-  void publishToMQTT(const char *topic, const char *payload); //--> Verified
+  void publishToMQTT(const String& topic, const String& payload); //--> Verified
 
   /**
    * Publish values to MQTT Server
@@ -199,9 +201,9 @@ private:
   /**
    *  Constructor.
    */
-  WiFiManager wifiManager;
-  WiFiClient espClient;
-  PubSubClient mqttClient;
+  WiFiManager _wifiManager;
+  WiFiClient _espClient;
+  PubSubClient _mqttClient;
 
   /**
    * Strig array for containing MQTT Topics
@@ -213,14 +215,13 @@ private:
   /**
    *  Status of Sensors Variables.
    */
-  const char *myClientID;
-  bool ttlSimulate;
-  bool ttlStatus;
-  bool myConnectToTTL;
-  char myMqttServer[40];
-  char myMqttPort[6];
-  bool mqttServerSet;
-  static bool shouldSaveConfig;
+  String _clientID;
+  bool _ttlStatus;
+  bool _connectToTTL;
+  String _mqttServer;
+  uint16_t _mqttPort;
+  bool _mqttServerSet;
+  static bool _shouldSaveConfig;
 
   /**
    *  Values of Sensors for Alarms.
@@ -235,16 +236,12 @@ private:
 
   void receiveWithEndMarker();
 
-  void showNewData();
-
   /**
    *
    */
-  const static byte numChars = 32;
-
-  char receivedChars[numChars]; // an array to store the received data
-
-  boolean newData = false;
+  const static byte _numChars = 32;
+  char _receivedChars[numChars]; // an array to store the received data
+  bool _newData = false;
 
   /**
    * Check JSON Config File

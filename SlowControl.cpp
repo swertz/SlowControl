@@ -15,23 +15,17 @@
 
 #include "SlowControl.h"
 
-#define my_mqtt_server "xxx.cloudmqtt.com"
-#define my_mqtt_port "1883"
-
 bool SlowControl::shouldSaveConfig = false;
 
-SlowControl::SlowControl() {
+SlowControl::SlowControl():
+    _clientID(SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID),
+    _ttlStatus(false),
+    _connectToTTL(false),
+    _mqttServerSet(false),
+    _mqttServer(SLOWCONTROL_DEFAULT_MQTT_SERVER),
+    _mqttPort(SLOWCONTROL_DEFAULT_MQTT_PORT) {
   // Pass WiFi Connection parameters to MQTT
   mqttClient.setClient(espClient);
-
-  // Setup Default Variables
-  ttlSimulate = false;
-  ttlStatus = false;
-  myConnectToTTL = false;
-  /*myMqttServer=NULL;
-  myMqttPort=NULL;*/
-  mqttServerSet = false;
-  // shouldSaveConfig=false;
 }
 
 void SlowControl::begin() {
@@ -49,53 +43,32 @@ void SlowControl::run() {
   showNewData();
 
   // Check MQTT Connection
-  if (!mqttClient.connected()) {
-    connectToMQTT(1, myClientID,
-                  myConnectToTTL); // Try to reconnect to MQTT one time.
+  if (!_mqttClient.connected()) {
+    connectToMQTT(1, _clientID,
+                  _connectToTTL); // Try to reconnect to MQTT one time.
   }
-  mqttClient.loop();
-
-  // Check Need of Publishing to MQTT
-  /*if(publishToMQTT)
-  {
-      if(mqttClient.connected())
-      {
-          //Publish readings to MQTT Topics
-          mqttClient.publish(temperatureDS_topic,String(tempDSC).c_str());
-          mqttClient.publish(temperatureSHT_topic,String(tempSHTC).c_str());
-          mqttClient.publish(humiditySHT_topic,String(humiSHT).c_str());
-          mqttClient.publish(dewPointSHT_topic,String(dewPointSHT).c_str());
-          if(ttlSimulate==false)
-          {
-              ttlSimulate=true;
-              mqttClient.publish(strcat(statusTTL_topic,myClientID),String(ttlStatus).c_str());
-          }
-      }
-      else
-      {
-          Serial.println("Not Connected to MQTT Server. Please be sure that your
-  MQTT Server is functional."); Serial.println();
-      }
-  }*/
+  _mqttClient.loop();
 }
 
-void SlowControl::setMQTTServer(String mqtt_server, uint16_t mqtt_port) {
+void SlowControl::setMQTTServer(
+        String mqtt_server,
+        uint16_t mqtt_port) {
   if (mqtt_server != "") {
     // Get reference of server
-    mqtt_server.toCharArray(myMqttServer, 15);
+    _mqttServer = mqtt_server;
+    _mqttPort = mqtt_port;
 
     // Setup MQTT Server
-    mqttClient.setServer(myMqttServer, mqtt_port);
+    _mqttClient.setServer(_mqttServer, _mqttPort);
 
     // Setup Callback
-    mqttClient.setCallback(
+    _mqttClient.setCallback(
         ([this](char *topic, byte *payload, unsigned int length) {
           this->callbackTTL(topic, payload, length);
         }));
 
     // Status of set
-    mqttServerSet = true;
-
+    _mqttServerSet = true;
   } else {
     Serial.println("MQTT Serverd not hardcoded");
   }
@@ -120,8 +93,8 @@ void SlowControl::checkJSONConfig() {
         JsonObject &json = jsonBuffer.parseObject(buf.get());
         json.printTo(Serial);
         if (json.success()) {
-          strcpy(myMqttServer, json["mqtt_server"]);
-          strcpy(myMqttPort, json["mqtt_port"]);
+          _mqttServer = json["mqtt_server"];
+          _mqttPort = String(json["mqtt_port"]).toInt();
         } else {
           Serial.println("Failed to lad Json Config");
         }
@@ -136,7 +109,7 @@ void SlowControl::checkJSONConfig() {
 }
 void SlowControl::saveConfigCallback() {
   Serial.println("Should Save Config");
-  shouldSaveConfig = true;
+  _shouldSaveConfig = true;
 }
 
 void SlowControl::connectToWifi() {
@@ -144,24 +117,24 @@ void SlowControl::connectToWifi() {
   checkJSONConfig();
 
   // Set Config Save Notify Callback
-  wifiManager.setSaveConfigCallback(&SlowControl::saveConfigCallback);
+  _wifiManager.setSaveConfigCallback(&SlowControl::saveConfigCallback);
 
-  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", myMqttServer,
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", _mqttServer.c_str(),
                                           40);
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", myMqttPort, 6);
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", String(_mqttPort).c_str(), 6);
 
   // Check If MQTT Credentials have been hardcoded
-  if (mqttServerSet == false) {
+  if (!_mqttServerSet) {
     // wifiManager.setBreakAfterConfig(true); //Try to connect one time and
     // thens exits.
-    wifiManager.addParameter(&custom_mqtt_server);
-    wifiManager.addParameter(&custom_mqtt_port);
+    _wifiManager.addParameter(&custom_mqtt_server);
+    _wifiManager.addParameter(&custom_mqtt_port);
   }
 
-  // Start Acces Point Configuration if you never connected the board to a WiFi
+  // Start Access Point Configuration if you never connected the board to a WiFi
   // previously
-  if (!wifiManager.autoConnect("AutoConnectAP", "password")) {
-    Serial.println("failed to connect, we should reset as see if it connects");
+  if (!_wifiManager.autoConnect(("AutoConnectAP-" + _clientID).c_str())) {
+    Serial.println("failed to connect, we should reset and see if it connects");
     delay(3000);
     ESP.reset();
     delay(5000);
@@ -174,8 +147,8 @@ void SlowControl::connectToWifi() {
   Serial.println(WiFi.macAddress());
 
   // Get value
-  strcpy(myMqttServer, custom_mqtt_server.getValue());
-  strcpy(myMqttPort, custom_mqtt_port.getValue());
+  _mqttServer= custom_mqtt_server.getValue();
+  _mqttPort = String(custom_mqtt_port.getValue()).toInt();
 
   // Save to FS
   if (shouldSaveConfig) {
@@ -193,75 +166,69 @@ void SlowControl::connectToWifi() {
     json.prettyPrintTo(Serial);
     json.printTo(configFile);
     configFile.close();
-    shouldSaveConfig = false;
+    _shouldSaveConfig = false;
   }
 }
 
 void SlowControl::resetWifiSettings() {
-  mqttServerSet = false;
-  wifiManager.resetSettings();
+  _mqttServerSet = false;
+  _wifiManager.resetSettings();
 }
 
-void SlowControl::connectToMQTT(int nbr, const char *clientID,
+void SlowControl::connectToMQTT(int nbr, const String clientID,
                                 bool connectToTTL) {
-  if (myMqttServer != "") {
-    setMQTTServer(myMqttServer, String(myMqttPort).toInt());
+  if (_mqttServer != "") {
+    setMQTTServer(_mqttServer, _mqttPort);
   }
-  myClientID = clientID;
-  myConnectToTTL = connectToTTL;
+  _clientID = clientID;
+  _connectToTTL = connectToTTL;
   // Try to connect to MQTT Server 5 times | 5 S timeout
-  while (!mqttClient.connected()) {
-    for (int i = 0; i < nbr; i++) {
-      Serial.println("Attempting MQTT Connection..." + String(i + 1) + "/\0" +
-                     String(nbr) + " targeting -> " + String(myMqttServer));
-
-      if (mqttClient.connect(myClientID)) {
-        Serial.println("Connected to MQTT Server.");
+  for (int i = 0; i < nbr; i++) {
+    Serial.println("Attempting MQTT Connection..." + String(i + 1) + "/\0" +
+                   String(nbr) + " targeting -> " + String(myMqttServer));
+  
+    if (_mqttClient.connect(_clientID)) {
+      Serial.println("Connected to MQTT Server.");
+      Serial.println();
+  
+      if (_connectToTTL == true) {
+        subscribeToSCBStatus();
+        Serial.println("Subscribed to Slow Control Board Status");
         Serial.println();
-
-        if (connectToTTL == true) {
-          subscribeToSCBStatus();
-          Serial.println("Subscribed to Slow Control Board Status");
-          Serial.println();
-        } else {
-          Serial.println("You didn't subcrisbed to Slow Control Board Status");
-          Serial.println();
-        }
-        break;
       } else {
-        delay(5000);
+        Serial.println("You didn't subcrisbed to Slow Control Board Status");
+        Serial.println();
       }
+      break;
+    } else {
+      delay(5000);
     }
-    Serial.println();
-    break;
   }
 }
 
 bool SlowControl::isConnected() {
-  if (mqttClient.connected()) {
+  if (_mqttClient.connected()) {
     return true;
   } else {
     return false;
   }
 }
 
-void SlowControl::publishToMQTT(const char *topic, const char *payload) {
-  mqttClient.publish(topic, payload);
+void SlowControl::publishToMQTT(const String& topic, const String& payload) {
+  _mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
-void SlowControl::publishValues(String *data_array) {
+void SlowControl::publishValues(const SensorValues& data) {
   char buffer[100];
 
-  for (int i = 0; i < data_array->length(); i++) {
-    strcpy(buffer, myClientID);
-    strcat(buffer, mqtt_topics[i].c_str());
-
-    publishToMQTT(buffer, data_array[i].c_str());
+  for (int i = 0; i < data.size(); i++) {
+    const String topic = _clientID + data[i].first;
+    publishToMQTT(topic, data[i].second);
   }
 }
 
-void SlowControl::subscribeToSCBStatus(const char *topic) {
-  mqttClient.subscribe(topic);
+void SlowControl::subscribeToSCBStatus(const String& topic) {
+  _mqttClient.subscribe(topic.c_str());
 }
 
 void SlowControl::callbackTTL(char *topic, byte *payload, unsigned int length) {
@@ -403,26 +370,31 @@ void SlowControl::receiveWithEndMarker() {
   char endMarker = '\@';
   char rc;
 
-  while (Serial.available() > 0 && newData == false) {
+  while (Serial.available() > 0 && _newData == false) {
     rc = Serial.read();
 
     if (rc != endMarker) {
-      receivedChars[ndx] = rc;
+      _receivedChars[ndx] = rc;
       ndx++;
-      if (ndx >= numChars) {
-        ndx = numChars - 1;
+      if (ndx >= _numChars) {
+        ndx = _numChars - 1;
       }
     } else {
-      receivedChars[ndx] = '\0'; // terminate the string
+      _receivedChars[ndx] = '\0'; // terminate the string
       ndx = 0;
-      newData = true;
+      _newData = true;
     }
   }
 }
 
 void SlowControl::showNewData() {
-  if (newData == true) {
-    resetWifiSettings();
+  if (_newData == true) {
+    String msg { _receivedChars };
+    Serial.println(("Received: " + msg).c_str());
+    if (msg == "RESET\@") {
+      resetWifiSettings();
+    }
+    _newData = false;
   }
 }
 
@@ -472,7 +444,7 @@ String(firstIP)+"."+String(secondIP)+"."+String(thirdIP)+"."+String(fourthIP);
         }
 }*/
 
-String SlowControl::getValue(String data, char separator, int index) {
+/*String SlowControl::getValue(String data, char separator, int index) {
   int found = 0;
   int strIndex[] = {0, -1};
   int maxIndex = data.length();
@@ -485,7 +457,7 @@ String SlowControl::getValue(String data, char separator, int index) {
     }
   }
   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
-}
+}*/
 
 /*void SlowControl::EEPROMWriteInt(int address, int number)
 {
