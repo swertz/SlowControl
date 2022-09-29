@@ -17,13 +17,11 @@
 
 bool SlowControl::_shouldSaveConfig = false;
 
-SlowControl::SlowControl(const String& clientID/* = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID*/):
-    _clientID(clientID),
-    _ttlStatus(false),
-    _connectToTTL(false),
-    _mqttServerSet(false),
-    _mqttServer(SLOWCONTROL_DEFAULT_MQTT_SERVER),
-    _mqttPort(SLOWCONTROL_DEFAULT_MQTT_PORT) {
+SlowControl::SlowControl(
+    const String &clientID /* = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID*/)
+    : _clientID(clientID), _ttlStatus(false), _connectToTTL(false),
+      _mqttServerSet(false), _mqttServer(SLOWCONTROL_DEFAULT_MQTT_SERVER),
+      _mqttPort(SLOWCONTROL_DEFAULT_MQTT_PORT) {
   // Pass WiFi Connection parameters to MQTT
   _mqttClient.setClient(_espClient);
 }
@@ -49,9 +47,7 @@ void SlowControl::run() {
   _mqttClient.loop();
 }
 
-void SlowControl::setMQTTServer(
-        const String& mqtt_server,
-        uint16_t mqtt_port) {
+void SlowControl::setMQTTServer(const String &mqtt_server, uint16_t mqtt_port) {
   if (mqtt_server != "") {
     // Get reference of server
     _mqttServer = mqtt_server;
@@ -90,7 +86,7 @@ void SlowControl::checkJSONConfig() {
         if (!err) {
           serializeJsonPretty(doc, Serial);
           Serial.println();
-          _mqttServer = doc["mqtt_server"].as<const char*>();
+          _mqttServer = doc["mqtt_server"].as<const char *>();
           _mqttPort = doc["mqtt_port"];
         } else {
           Serial.println("Failed to load Json Config, error is:");
@@ -117,15 +113,16 @@ void SlowControl::connectToWifi() {
   // if at this point the server is empty, something wrong happened
   // and we should make sure we can reconfigure it through the wifi portal
   if (_mqttServer == "") {
-      resetWifiSettings();
+    resetWifiSettings();
   }
 
   // Set Config Save Notify Callback
   _wifiManager.setSaveConfigCallback(&SlowControl::saveConfigCallback);
 
-  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", _mqttServer.c_str(),
-                                          40);
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", String(_mqttPort).c_str(), 6);
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server",
+                                          _mqttServer.c_str(), 40);
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port",
+                                        String(_mqttPort).c_str(), 6);
 
   // Check If MQTT Credentials have been hardcoded
   if (!_mqttServerSet) {
@@ -138,7 +135,8 @@ void SlowControl::connectToWifi() {
   // Start Access Point Configuration if you never connected the board to a WiFi
   // previously
   if (!_wifiManager.autoConnect(("AutoConnectAP-" + _clientID).c_str())) {
-    Serial.println(F("Failed to connect, we should reset and see if it connects"));
+    Serial.println(
+        F("Failed to connect, we should reset and see if it connects"));
     delay(3000);
     ESP.reset();
     delay(5000);
@@ -152,7 +150,7 @@ void SlowControl::connectToWifi() {
 
   // Get value
   if (!_mqttServerSet) {
-    _mqttServer= custom_mqtt_server.getValue();
+    _mqttServer = custom_mqtt_server.getValue();
     _mqttPort = String(custom_mqtt_port.getValue()).toInt();
   }
 
@@ -189,12 +187,13 @@ void SlowControl::connectToMQTT(int nbr, bool connectToTTL) {
   // Try to connect to MQTT Server n times | 5 S timeout
   for (int i = 0; i < nbr; i++) {
     Serial.println("Attempting MQTT Connection..." + String(i + 1) + "/\0" +
-                   String(nbr) + " targeting -> " + _mqttServer + ":" + String(_mqttPort));
-  
+                   String(nbr) + " targeting -> " + _mqttServer + ":" +
+                   String(_mqttPort));
+
     if (_mqttClient.connect(_clientID.c_str())) {
       Serial.println("Connected to MQTT Server.");
       Serial.println();
-  
+
       if (_connectToTTL == true) {
         subscribeToSCBStatus();
         Serial.println(F("Subscribed to Slow Control Board Status"));
@@ -218,17 +217,17 @@ bool SlowControl::isConnected() {
   }
 }
 
-void SlowControl::publishToMQTT(const String& topic, const String& payload) {
+void SlowControl::publishToMQTT(const String &topic, const String &payload) {
   _mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
-void SlowControl::publishValues(const SensorValues& data) {
-  for (const auto& reading: data) {
+void SlowControl::publishValues(const SensorValues &data) {
+  for (const auto &reading : data) {
     publishToMQTT(_clientID + reading[0], reading[1]);
   }
 }
 
-void SlowControl::subscribeToSCBStatus(const String& topic) {
+void SlowControl::subscribeToSCBStatus(const String &topic) {
   _mqttClient.subscribe(topic.c_str());
 }
 
@@ -246,7 +245,6 @@ void SlowControl::callbackTTL(char *topic, byte *payload, unsigned int length) {
 void SlowControl::set_TTL_OUTPUT(int state) {
   digitalWrite(SLOWCONTROL_DEFAULT_TTL, state);
 }
-
 
 // Private Fuctions
 
@@ -283,7 +281,7 @@ void SlowControl::receiveWithEndMarker() {
 
 void SlowControl::showNewData() {
   if (_newData == true) {
-    String msg { _receivedChars };
+    String msg{_receivedChars};
     Serial.println(("Received: " + msg).c_str());
     if (msg == "RESET") {
       resetWifiSettings();

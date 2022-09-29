@@ -11,19 +11,17 @@
 // Credentials - If not you will be able to enter it in the Access Point
 //#define DEFAULT_MQTT_SERVER "192.168.1.105"
 
-#define PUB_INTERVAL_MS 5000  // polling & publication interval in ms
-
+#define PUB_INTERVAL_MS 5000 // polling & publication interval in ms
 
 // Active sensors, comment to deactivate
 //#define SENSOR_DS  // DS18B20: temperature, precise
 //#define SENSOR_BME  // BME280: humidity, temperature, pressure
 //#define SENSOR_CCS  // CCS811: VOC
-#define SENSOR_SCD  // SCD30: CO2
+#define SENSOR_SCD // SCD30: CO2
 
 //////////////////////////////
 /// End configuration ////////
 //////////////////////////////
-
 
 SlowControl slowControl(DISCO_ID);
 // Some shenanigans because the DS/BME/CCS board and the SCD sensor
@@ -43,19 +41,19 @@ void setup() {
   // Start Slow Control Library
   slowControl.begin();
 
-  // Start Disco Sensors Library
-  #ifdef SENSOR_DS
+// Start Disco Sensors Library
+#ifdef SENSOR_DS
   mySensors.activateDS();
-  #endif
-  #ifdef SENSOR_BME
+#endif
+#ifdef SENSOR_BME
   mySensors.activateBME();
-  #endif
-  #ifdef SENSOR_CCS
+#endif
+#ifdef SENSOR_CCS
   mySensors.activateCCS();
-  #endif
-  #ifdef SENSOR_SCD
+#endif
+#ifdef SENSOR_SCD
   mySensors.activateSCD();
-  #endif
+#endif
   mySensors.begin();
 
   // Reset WiFi Settings if needed --> Uncomment --> Upload --> Comment Again
@@ -64,13 +62,14 @@ void setup() {
   // Initialize WiFi Communication
   slowControl.connectToWifi();
 
-  #ifdef DEFAULT_MQTT_SERVER
+#ifdef DEFAULT_MQTT_SERVER
   slowControl.setMQTTServer(DEFAULT_MQTT_SERVER);
-  #endif
+#endif
 
   // Initialize MQTT Communication
-  slowControl.connectToMQTT(3, false); // Parameter 1 = Number of tries
-                                       // Parameter 2 = Subscription to TTl Status
+  slowControl.connectToMQTT(3,
+                            false); // Parameter 1 = Number of tries
+                                    // Parameter 2 = Subscription to TTl Status
 
   // Set Sensors values to trigger alarms
   // mySensors.setAlarmSensor("TEMP", 14.0, 27.0);
@@ -104,6 +103,6 @@ void loop() {
     // Publish Values
     slowControl.publishValues(sensor_values);
   }
-  
+
   delay(PUB_INTERVAL_MS);
 }

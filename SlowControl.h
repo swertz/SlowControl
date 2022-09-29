@@ -42,7 +42,7 @@ public:
   /**
    *  Constructor.
    */
-  SlowControl(const String& clientID = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID);
+  SlowControl(const String &clientID = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID);
 
   /**
    * Initialises the Slow Control Library
@@ -62,9 +62,9 @@ public:
    *If not create you will be able to enter it in the Access Point while
    *configuring the Wifi
    */
-  void setMQTTServer(
-      const String& mqtt_server = SLOWCONTROL_DEFAULT_MQTT_SERVER,
-      uint16_t mqtt_port = SLOWCONTROL_DEFAULT_MQTT_PORT);
+  void
+  setMQTTServer(const String &mqtt_server = SLOWCONTROL_DEFAULT_MQTT_SERVER,
+                uint16_t mqtt_port = SLOWCONTROL_DEFAULT_MQTT_PORT);
 
   /**
    * Initialises the WIFI Communication
@@ -102,7 +102,7 @@ public:
    *publish
    *
    */
-  void publishToMQTT(const String& topic, const String& payload);
+  void publishToMQTT(const String &topic, const String &payload);
 
   /**
    * Publish values to MQTT Server
@@ -111,7 +111,7 @@ public:
    *publish
    *
    */
-  void publishValues(const SensorValues& data);
+  void publishValues(const SensorValues &data);
 
   /**
    * Subscribe to TTL Status
@@ -120,7 +120,7 @@ public:
    *
    *If it doesnt suit, pass yours as paramaters
    */
-  void subscribeToSCBStatus(const String& topic = statusTTL_topic);
+  void subscribeToSCBStatus(const String &topic = statusTTL_topic);
 
   /**
    * Setup callback function
