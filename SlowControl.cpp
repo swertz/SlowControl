@@ -3,29 +3,29 @@
 
   Designed specifically to work with the Slow Control Board from UCLouvain
  designed by Antoine Deblaere
-  ----> lien github
 
   This library will allow you to easily connect to WIFI, communicate with
  Sensors, and more
 
 
   Written by Antoine Deblaere for IRMP/CP3
+  Modified by Sebastien Wertz
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
 #include "SlowControl.h"
 
-bool SlowControl::shouldSaveConfig = false;
+bool SlowControl::_shouldSaveConfig = false;
 
-SlowControl::SlowControl():
-    _clientID(SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID),
+SlowControl::SlowControl(const String& clientID/* = SLOWCONTROL_DEFAULT_MQTT_CLIENT_ID*/):
+    _clientID(clientID),
     _ttlStatus(false),
     _connectToTTL(false),
     _mqttServerSet(false),
     _mqttServer(SLOWCONTROL_DEFAULT_MQTT_SERVER),
     _mqttPort(SLOWCONTROL_DEFAULT_MQTT_PORT) {
   // Pass WiFi Connection parameters to MQTT
-  mqttClient.setClient(espClient);
+  _mqttClient.setClient(_espClient);
 }
 
 void SlowControl::begin() {
@@ -44,14 +44,13 @@ void SlowControl::run() {
 
   // Check MQTT Connection
   if (!_mqttClient.connected()) {
-    connectToMQTT(1, _clientID,
-                  _connectToTTL); // Try to reconnect to MQTT one time.
+    connectToMQTT(1, _connectToTTL); // Try to reconnect to MQTT one time.
   }
   _mqttClient.loop();
 }
 
 void SlowControl::setMQTTServer(
-        String mqtt_server,
+        const String& mqtt_server,
         uint16_t mqtt_port) {
   if (mqtt_server != "") {
     // Get reference of server
@@ -59,7 +58,7 @@ void SlowControl::setMQTTServer(
     _mqttPort = mqtt_port;
 
     // Setup MQTT Server
-    _mqttClient.setServer(_mqttServer, _mqttPort);
+    _mqttClient.setServer(_mqttServer.c_str(), _mqttPort);
 
     // Setup Callback
     _mqttClient.setCallback(
@@ -70,7 +69,7 @@ void SlowControl::setMQTTServer(
     // Status of set
     _mqttServerSet = true;
   } else {
-    Serial.println("MQTT Serverd not hardcoded");
+    Serial.println("MQTT Server not hardcoded");
   }
 }
 
@@ -84,19 +83,18 @@ void SlowControl::checkJSONConfig() {
       File configFile = SPIFFS.open("/config.json", "r");
       if (configFile) {
         Serial.println("Opened Config File");
-        size_t size = configFile.size();
-        // Allocate a buffer to store the contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
 
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject &json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-          _mqttServer = json["mqtt_server"];
-          _mqttPort = String(json["mqtt_port"]).toInt();
+        // need to pass number of bytes expected to be read
+        StaticJsonDocument<JSON_OBJECT_SIZE(2) + 50> doc;
+        DeserializationError err = deserializeJson(doc, configFile);
+        if (!err) {
+          serializeJsonPretty(doc, Serial);
+          Serial.println();
+          _mqttServer = doc["mqtt_server"].as<const char*>();
+          _mqttPort = doc["mqtt_port"];
         } else {
-          Serial.println("Failed to lad Json Config");
+          Serial.println("Failed to load Json Config, error is:");
+          Serial.println(err.c_str());
         }
       }
     } else {
@@ -116,6 +114,12 @@ void SlowControl::connectToWifi() {
   // Check Json Config File
   checkJSONConfig();
 
+  // if at this point the server is empty, something wrong happened
+  // and we should make sure we can reconfigure it through the wifi portal
+  if (_mqttServer == "") {
+      resetWifiSettings();
+  }
+
   // Set Config Save Notify Callback
   _wifiManager.setSaveConfigCallback(&SlowControl::saveConfigCallback);
 
@@ -134,7 +138,7 @@ void SlowControl::connectToWifi() {
   // Start Access Point Configuration if you never connected the board to a WiFi
   // previously
   if (!_wifiManager.autoConnect(("AutoConnectAP-" + _clientID).c_str())) {
-    Serial.println("failed to connect, we should reset and see if it connects");
+    Serial.println(F("Failed to connect, we should reset and see if it connects"));
     delay(3000);
     ESP.reset();
     delay(5000);
@@ -147,24 +151,26 @@ void SlowControl::connectToWifi() {
   Serial.println(WiFi.macAddress());
 
   // Get value
-  _mqttServer= custom_mqtt_server.getValue();
-  _mqttPort = String(custom_mqtt_port.getValue()).toInt();
+  if (!_mqttServerSet) {
+    _mqttServer= custom_mqtt_server.getValue();
+    _mqttPort = String(custom_mqtt_port.getValue()).toInt();
+  }
 
   // Save to FS
-  if (shouldSaveConfig) {
+  if (_shouldSaveConfig) {
     Serial.println("Saving Config");
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject &json = jsonBuffer.createObject();
-    json["mqtt_server"] = myMqttServer;
-    json["mqtt_port"] = myMqttPort;
+    StaticJsonDocument<JSON_OBJECT_SIZE(3)> doc;
+    doc["mqtt_server"] = _mqttServer;
+    doc["mqtt_port"] = _mqttPort;
 
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
-      Serial.println("Failed to open config file for writing");
+      Serial.println(F("Failed to open config file for writing"));
     }
 
-    json.prettyPrintTo(Serial);
-    json.printTo(configFile);
+    serializeJsonPretty(doc, Serial);
+    Serial.println();
+    serializeJson(doc, configFile);
     configFile.close();
     _shouldSaveConfig = false;
   }
@@ -175,28 +181,26 @@ void SlowControl::resetWifiSettings() {
   _wifiManager.resetSettings();
 }
 
-void SlowControl::connectToMQTT(int nbr, const String clientID,
-                                bool connectToTTL) {
+void SlowControl::connectToMQTT(int nbr, bool connectToTTL) {
   if (_mqttServer != "") {
     setMQTTServer(_mqttServer, _mqttPort);
   }
-  _clientID = clientID;
   _connectToTTL = connectToTTL;
-  // Try to connect to MQTT Server 5 times | 5 S timeout
+  // Try to connect to MQTT Server n times | 5 S timeout
   for (int i = 0; i < nbr; i++) {
     Serial.println("Attempting MQTT Connection..." + String(i + 1) + "/\0" +
-                   String(nbr) + " targeting -> " + String(myMqttServer));
+                   String(nbr) + " targeting -> " + _mqttServer + ":" + String(_mqttPort));
   
-    if (_mqttClient.connect(_clientID)) {
+    if (_mqttClient.connect(_clientID.c_str())) {
       Serial.println("Connected to MQTT Server.");
       Serial.println();
   
       if (_connectToTTL == true) {
         subscribeToSCBStatus();
-        Serial.println("Subscribed to Slow Control Board Status");
+        Serial.println(F("Subscribed to Slow Control Board Status"));
         Serial.println();
       } else {
-        Serial.println("You didn't subcrisbed to Slow Control Board Status");
+        Serial.println(F("You didn't subscribe to Slow Control Board Status"));
         Serial.println();
       }
       break;
@@ -219,11 +223,8 @@ void SlowControl::publishToMQTT(const String& topic, const String& payload) {
 }
 
 void SlowControl::publishValues(const SensorValues& data) {
-  char buffer[100];
-
-  for (int i = 0; i < data.size(); i++) {
-    const String topic = _clientID + data[i].first;
-    publishToMQTT(topic, data[i].second);
+  for (const auto& reading: data) {
+    publishToMQTT(_clientID + reading[0], reading[1]);
   }
 }
 
@@ -246,113 +247,6 @@ void SlowControl::set_TTL_OUTPUT(int state) {
   digitalWrite(SLOWCONTROL_DEFAULT_TTL, state);
 }
 
-/*void SlowControl::getNumberOfTemperatureSensors()
-{
-    // Locating devices on the bus
-    Serial.print("Locating temperatures sensors...");
-    Serial.print("Found ");
-    deviceTempCount = ds.getDeviceCount();
-    Serial.print(deviceTempCount, DEC);
-    Serial.println(" devices.");
-    Serial.println("");
-
-        //Check if there're some devices
-        if(deviceTempCount!=0)
-        {
-                dsFound=true;
-        }
-}
-
-void SlowControl::getNumberOfHumiditySensors()
-{
-    //Try to communicate
-    if(sht.readStatus()!=0xFFFF)
-    {
-        shtFound=true;
-        Serial.println("Can communicate with Humidty Sensors");
-        Serial.println();
-    }
-    else
-    {
-        Serial.println("I2C Communication could not be etablished. Check your
-wiring !"); Serial.println();
-    }
-}
-
-void SlowControl::readTemperature()
-{
-    if(dsFound==true)
-    {
-        // Send command to all the sensors for temperature conversion
-        ds.requestTemperatures();
-
-        // Display temperature from each sensor
-        for (int i = 0;  i < deviceTempCount;  i++)
-        {
-            Serial.print("Sensor ");
-            Serial.print(i+1);
-            Serial.print(" : ");
-            tempDSC = ds.getTempCByIndex(i);
-            Serial.print(tempDSC);
-            Serial.print((char)176);//shows degrees character
-            Serial.print("C ");
-        }
-    }
-    else
-    {
-
-    }
-}
-
-void SlowControl::readTempSHT()
-{
-    tempSHTC=sht.readTemperature();
-
-    if (! isnan(tempSHTC))
-    {
-        Serial.print("SHT-85 | Temp *C = "); Serial.println(tempSHTC);
-    }
-    else
-    {
-        Serial.println("Failed to read temperature");
-    }
-}
-
-void SlowControl::readHumiditySHT()
-{
-    humiSHT=sht.readHumidity();
-
-    if (! isnan(humiSHT))
-    {
-        Serial.print("SHT-85 | Hum. % = "); Serial.println(humiSHT);
-    }
-    else
-    {
-        Serial.println("Failed to read humidity");
-    }
-}
-
-void SlowControl::calculateDewPointSHT()
-{
-    if(shtFound==true)
-    {
-        float tn = tempSHTC < 0.0 ? 272.62 : 243.12;
-        float m = tempSHTC < 0.0 ? 22.46 : 17.62;
-
-        float l = logf(humiSHT / 100.0);
-        float r = m * tempSHTC / (tn + tempSHTC);
-
-        dewPointSHT=tn * (l + r) / (m - l - r);
-
-        Serial.println(dewPointSHT);
-    }
-    else
-    {
-        Serial.println("DewPoint couldn't be calculated. Please be sure that
-you're getting readings of the SHT Sensors."); Serial.println();
-    }
-
-}*/
 
 // Private Fuctions
 
@@ -367,7 +261,7 @@ String SlowControl::byteArrayToString(byte *payload, unsigned int length) {
 
 void SlowControl::receiveWithEndMarker() {
   static byte ndx = 0;
-  char endMarker = '\@';
+  char endMarker = '@';
   char rc;
 
   while (Serial.available() > 0 && _newData == false) {
@@ -391,8 +285,9 @@ void SlowControl::showNewData() {
   if (_newData == true) {
     String msg { _receivedChars };
     Serial.println(("Received: " + msg).c_str());
-    if (msg == "RESET\@") {
+    if (msg == "RESET") {
       resetWifiSettings();
+      ESP.reset();
     }
     _newData = false;
   }
