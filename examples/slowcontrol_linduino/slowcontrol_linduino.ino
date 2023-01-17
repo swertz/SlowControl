@@ -1,4 +1,3 @@
-#include <ArduinoSTL.h>
 #include <Disco_Linduino.h>
 #include <SlowControl.h>
 
@@ -9,7 +8,7 @@
 #define DISCO_ID "ESP04"
 
 // channel nr. 1 connected to channel 4 on DC2210A board
-#define CHANNELS { {"1", 4}}
+#define CHANNELS {{"1", 4}}
 
 // Set MQTT Server - Uncomment this definition if you want to hardcode your MQTT
 // Credentials - If not you will be able to enter it in the Access Point
